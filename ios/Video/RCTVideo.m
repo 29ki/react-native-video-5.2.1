@@ -25,6 +25,7 @@ static int const RCTVideoUnset = -1;
 @implementation RCTVideo
 {
   AVPlayer *_player;
+  NSObject *_playerLooper;
   AVPlayerItem *_playerItem;
   NSDictionary *_source;
   BOOL _playerItemObserversSet;
@@ -364,10 +365,7 @@ static int const RCTVideoUnset = -1;
     
     // perform on next run loop, otherwise other passed react-props may not be set
     [self playerItemForSource:self->_source withCallback:^(AVPlayerItem * playerItem) {
-      self->_playerItem = playerItem;
-      _playerItem = playerItem;
       [self setPreferredForwardBufferDuration:_preferredForwardBufferDuration];
-      [self addPlayerItemObservers];
       [self setFilter:self->_filterName];
       [self setMaxBitRate:self->_maxBitRate];
       
@@ -381,8 +379,20 @@ static int const RCTVideoUnset = -1;
         [self->_player removeObserver:self forKeyPath:externalPlaybackActive context:nil];
         self->_isExternalPlaybackActiveObserverRegistered = NO;
       }
-      
-      self->_player = [AVPlayer playerWithPlayerItem:self->_playerItem];
+
+      if (@available(iOS 10.0, *)) {
+          self->_player = [AVQueuePlayer playerWithPlayerItem:playerItem];
+          if (self->_repeat) {
+              self->_playerLooper = [AVPlayerLooper playerLooperWithPlayer:(AVQueuePlayer *)self->_player templateItem:playerItem];
+          }
+      } else {
+          self->_player = [AVPlayer playerWithPlayerItem:playerItem];
+      }
+
+      self->_playerItem = playerItem;
+      _playerItem = playerItem;
+      [self addPlayerItemObservers];
+      [self applyModifiers];
       self->_player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
       
       [self->_player addObserver:self forKeyPath:playbackRate options:0 context:nil];
@@ -832,9 +842,11 @@ static int const RCTVideoUnset = -1;
   }
   
   if (_repeat) {
-    AVPlayerItem *item = [notification object];
-    [item seekToTime:kCMTimeZero];
-    [self applyModifiers];
+    if (self->_playerLooper == nil) {
+      AVPlayerItem *item = [notification object];
+      [item seekToTime:kCMTimeZero];
+      [self applyModifiers];
+    }
   } else {
     [self removePlayerTimeObserver];
   }
@@ -1098,6 +1110,13 @@ static int const RCTVideoUnset = -1;
 
 - (void)setRepeat:(BOOL)repeat {
   _repeat = repeat;
+  if (@available(iOS 10, *)) {
+      if (_repeat && _player != nil && _playerItem != nil) {
+          _playerLooper = _playerLooper != nil ? _playerLooper : [AVPlayerLooper playerLooperWithPlayer:(AVQueuePlayer *)_player templateItem:_playerItem];
+      } else {
+          _playerLooper = nil;
+      }
+  }
 }
 
 - (void)setMediaSelectionTrackForCharacteristic:(AVMediaCharacteristic)characteristic
@@ -1624,6 +1643,7 @@ static int const RCTVideoUnset = -1;
     _isExternalPlaybackActiveObserverRegistered = NO;
   }
   _player = nil;
+  _playerLooper = nil;
   
   [self removePlayerLayer];
   
