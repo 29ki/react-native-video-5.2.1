@@ -10,6 +10,7 @@ static NSString *const statusKeyPath = @"status";
 static NSString *const playbackLikelyToKeepUpKeyPath = @"playbackLikelyToKeepUp";
 static NSString *const playbackBufferEmptyKeyPath = @"playbackBufferEmpty";
 static NSString *const readyForDisplayKeyPath = @"readyForDisplay";
+static NSString *const loopCountKeyPath = @"loopCount";
 static NSString *const playbackRate = @"rate";
 static NSString *const timedMetadata = @"timedMetadata";
 static NSString *const externalPlaybackActive = @"externalPlaybackActive";
@@ -353,6 +354,20 @@ static int const RCTVideoUnset = -1;
   }
 }
 
+- (void)addPlayerLooperObservers
+{
+  if (_playerLooper != nil) {
+    [_playerLooper addObserver:self forKeyPath:loopCountKeyPath options:0 context:nil];
+  }
+}
+
+- (void)removePlayerLooperObservers
+{
+  if (_playerLooper != nil) {
+    [_playerLooper removeObserver:self forKeyPath:loopCountKeyPath];
+  }
+}
+
 #pragma mark - Player and source
 
 - (void)setSrc:(NSDictionary *)source
@@ -361,6 +376,7 @@ static int const RCTVideoUnset = -1;
   [self removePlayerLayer];
   [self removePlayerTimeObserver];
   [self removePlayerItemObservers];
+  [self removePlayerLooperObservers];
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) 0), dispatch_get_main_queue(), ^{
     
     // perform on next run loop, otherwise other passed react-props may not be set
@@ -384,14 +400,19 @@ static int const RCTVideoUnset = -1;
           self->_player = [AVQueuePlayer playerWithPlayerItem:playerItem];
           if (self->_repeat) {
               self->_playerLooper = [AVPlayerLooper playerLooperWithPlayer:(AVQueuePlayer *)self->_player templateItem:playerItem];
+              [self addPlayerLooperObservers];
           }
+
+          self->_playerItem = playerItem;
+          _playerItem = playerItem;
+          [self addPlayerItemObservers];
       } else {
+          self->_playerItem = playerItem;
+          _playerItem = playerItem;
+          [self addPlayerItemObservers];
           self->_player = [AVPlayer playerWithPlayerItem:playerItem];
       }
 
-      self->_playerItem = playerItem;
-      _playerItem = playerItem;
-      [self addPlayerItemObservers];
       [self applyModifiers];
       self->_player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
       
@@ -767,6 +788,12 @@ static int const RCTVideoUnset = -1;
 
         return;
       }
+  } else if (object == _playerLooper) {
+    if([keyPath isEqualToString:loopCountKeyPath]) {
+      if(self.onVideoEnd) {
+        self.onVideoEnd(@{@"target": self.reactTag});
+      }
+    }
   }
 }
 
@@ -837,7 +864,7 @@ static int const RCTVideoUnset = -1;
 
 - (void)playerItemDidReachEnd:(NSNotification *)notification
 {
-  if(self.onVideoEnd) {
+  if(self.onVideoEnd && self->_playerLooper == nil) {
     self.onVideoEnd(@{@"target": self.reactTag});
   }
   
@@ -1112,9 +1139,12 @@ static int const RCTVideoUnset = -1;
   _repeat = repeat;
   if (@available(iOS 10, *)) {
       if (_repeat && _player != nil && _playerItem != nil) {
-          _playerLooper = _playerLooper != nil ? _playerLooper : [AVPlayerLooper playerLooperWithPlayer:(AVQueuePlayer *)_player templateItem:_playerItem];
+        [self removePlayerLooperObservers];
+        _playerLooper = _playerLooper != nil ? _playerLooper : [AVPlayerLooper playerLooperWithPlayer:(AVQueuePlayer *)_player templateItem:_playerItem];
+        [self addPlayerLooperObservers];
       } else {
-          _playerLooper = nil;
+        [self removePlayerLooperObservers];
+        _playerLooper = nil;
       }
   }
 }

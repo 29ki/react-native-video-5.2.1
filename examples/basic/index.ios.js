@@ -188,6 +188,7 @@ class VideoPlayer extends Component {
             onLoad={this.onLoad}
             onBuffer={this.onBuffer}
             onProgress={this.onProgress}
+            onEnd={() => console.log('END')}
             
             repeat={true}
             filter={this.state.filter}
