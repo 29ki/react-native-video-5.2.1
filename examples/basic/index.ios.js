@@ -188,7 +188,7 @@ class VideoPlayer extends Component {
             onLoad={this.onLoad}
             onBuffer={this.onBuffer}
             onProgress={this.onProgress}
-            onEnd={() => { AlertIOS.alert('Done!') }}
+            
             repeat={true}
             filter={this.state.filter}
             filterEnabled={this.state.filterEnabled}
