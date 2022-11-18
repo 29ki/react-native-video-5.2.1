@@ -407,7 +407,9 @@ static int const RCTVideoUnset = -1;
 {
   if (@available(iOS 10.0, *)) {
     if (_playerLooper != nil) {
-      [_playerLooper removeObserver:self forKeyPath:loopCountKeyPath];
+      @try{
+        [_playerLooper removeObserver:self forKeyPath:loopStatusKeyPath];
+      }@catch(id anException){}
       AVPlayerLooper* looper = (AVPlayerLooper *)_playerLooper;
       for (AVPlayerItem* item in [looper loopingPlayerItems]) {
           [[NSNotificationCenter defaultCenter] removeObserver:self
@@ -446,7 +448,6 @@ static int const RCTVideoUnset = -1;
 - (void)setUpLooper:(AVPlayerItem*)playerItem
 {
   [self removePlayerLooperObservers];
-  self->_playerLooper = nil;
 
   if (@available(iOS 10.0, *)) {
     if (self->_player != nil && playerItem != nil) {
@@ -849,7 +850,6 @@ static int const RCTVideoUnset = -1;
           [self addPlayerLooperItemsObserver];
         }
       }
-      
     }
   }
 }
@@ -937,7 +937,6 @@ static int const RCTVideoUnset = -1;
     [item seekToTime:kCMTimeZero];
     [self applyModifiers];
   }
-  
 }
 
 #pragma mark - Prop setters
