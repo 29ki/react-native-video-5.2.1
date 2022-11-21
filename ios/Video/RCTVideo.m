@@ -426,7 +426,6 @@ static int const RCTVideoUnset = -1;
 {
   [self removePlayerObservers];
   [self removePlayerItemObservers];
-  [_player pause];
   
   if (@available(iOS 10.0, *)) {
     self->_player = [AVQueuePlayer playerWithPlayerItem:playerItem];
